@@ -224,7 +224,7 @@ def _mount_spa():
                 from fastapi.responses import FileResponse
                 return FileResponse(str(static_file))
         if _index_html.is_file():
-            return HTMLResponse(_index_html.read_text())
+            return HTMLResponse(_index_html.read_text(encoding="utf-8"))
         raise HTTPException(status_code=404, detail="Frontend not built")
 
 
