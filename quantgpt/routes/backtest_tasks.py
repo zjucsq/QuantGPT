@@ -401,23 +401,34 @@ def health():
 async def cancel_task(
     task_id: str,
     user: User | None = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    task = tasks.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
-
     user_id = str(user.id) if user else GUEST_USER_ID
-    if task.get("user_id") != user_id:
-        raise HTTPException(status_code=403, detail="无权操作此任务")
 
-    if task["status"] in ("completed", "failed", "cancelled", "iteration_completed"):
+    task = tasks.get(task_id)
+    if task:
+        if task.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="无权操作此任务")
+        if task["status"] in ("completed", "failed", "cancelled", "iteration_completed"):
+            raise HTTPException(status_code=400, detail="任务已结束，无法取消")
+        with tasks_lock:
+            task["cancelled"] = True
+            task["status"] = "cancelled"
+        logger.info(f"[{task_id}] cancel requested by user")
+        return {"task_id": task_id, "status": "cancelled"}
+
+    result = await db.execute(
+        select(TaskModel).where(TaskModel.id == task_id, TaskModel.user_id == user.id)
+    )
+    db_task = result.scalar_one_or_none()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if db_task.status in ("completed", "failed", "cancelled", "iteration_completed"):
         raise HTTPException(status_code=400, detail="任务已结束，无法取消")
-
-    with tasks_lock:
-        task["cancelled"] = True
-        task["status"] = "cancelled"
-
-    logger.info(f"[{task_id}] cancel requested by user")
+    db_task.status = "cancelled"
+    db_task.error = "用户手动取消"
+    await db.commit()
+    logger.info(f"[{task_id}] db task cancelled by user")
     return {"task_id": task_id, "status": "cancelled"}
 
 

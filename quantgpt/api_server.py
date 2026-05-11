@@ -28,11 +28,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from . import task_store
 from .db import close_db, init_db
-from .models import User
+from .models import Task as TaskModel, User
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,17 @@ async def lifespan(app: FastAPI):
     task_store.main_loop = asyncio.get_running_loop()
     await init_db()
     logger.info("Database initialized")
+
+    from .db import _get_session_factory as _sf
+    async with _sf()() as session:
+        result = await session.execute(
+            update(TaskModel)
+            .where(TaskModel.status.in_(["pending", "running", "generating_expression", "validating", "fetching_data", "backtesting"]))
+            .values(status="failed", error="进程重启，任务中断")
+        )
+        if result.rowcount:
+            await session.commit()
+            logger.info(f"Cleaned up {result.rowcount} stale running tasks")
 
     from .auth import _DEV_USER_ID, is_auth_disabled
     if is_auth_disabled():

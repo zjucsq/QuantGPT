@@ -458,6 +458,24 @@ alembic upgrade head
 <details>
 <summary><b>Expression Examples</b></summary>
 
+**Local backtest** — works out of the box with baostock/akshare data:
+
+```python
+# 20-day momentum
+rank(close / ts_mean(close, 20))
+
+# Low volatility
+rank(-1 * ts_std(close/ts_shift(close,1)-1, 20))
+
+# Decay-weighted correlation
+decay_linear(rank(ts_corr(vwap, volume, 10)), 5)
+
+# Momentum + profitability composite
+-1 * rank(ts_av_diff(close, 10)) + rank(roe)
+```
+
+**WQ BRAIN remote** — requires WQ BRAIN submission (fields like `debt`, `enterprise_value` are not available locally):
+
 ```python
 # Debt-momentum composite — BRAIN submitted, Fitness 1.26, Sharpe 1.77
 -1 * rank(ts_av_diff(close, 10)) + rank(debt / enterprise_value)
@@ -467,15 +485,6 @@ alembic upgrade head
 
 # Returns-volume momentum — BRAIN submitted, Fitness 1.03, Sharpe 1.60
 -1 * rank(ts_decay_linear(returns * volume / adv20, 5))
-
-# 20-day momentum
-rank(close / ts_mean(close, 20))
-
-# Low volatility
-rank(-1 * ts_std(close/ts_shift(close,1)-1, 20))
-
-# Decay-weighted correlation
-decay_linear(rank(ts_corr(vwap, volume, 10)), 5)
 ```
 
 </details>
