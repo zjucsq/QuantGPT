@@ -19,8 +19,7 @@ from ..backtest import api_context
 from ..expression_parser import parse_expression
 from ..market_data import MarketDataFetcher, get_universe
 from ..models import User
-from ..schemas import validate_date_format as _validate_date
-from ..schemas import validate_universe_value as _validate_universe
+from ..schemas import VALID_UNIVERSES
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +47,19 @@ class FactorValuesRequest(BaseModel):
     @field_validator("universe")
     @classmethod
     def validate_universe(cls, v: str) -> str:
-        return _validate_universe(v)
+        if v not in VALID_UNIVERSES:
+            raise ValueError(f"universe must be one of {VALID_UNIVERSES}")
+        return v
 
     @field_validator("start_date", "end_date")
     @classmethod
     def validate_dates(cls, v: str) -> str:
         if v:
-            _validate_date(v)
+            from datetime import datetime
+            try:
+                datetime.strptime(v, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError("date must be YYYY-MM-DD format")
         return v
 
 
