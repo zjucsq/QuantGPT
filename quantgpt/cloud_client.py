@@ -7,6 +7,8 @@ validation, track-record tracking, and public attestation.
 import logging
 import os
 
+import numpy as np
+import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -16,8 +18,23 @@ logger = logging.getLogger(__name__)
 _ENV_API_KEY = "QUANTGPT_CLOUD_API_KEY"
 _ENV_BASE_URL = "QUANTGPT_CLOUD_URL"
 _DEFAULT_BASE_URL = "https://quant-gpt.com"
-_UPLOAD_BATCH_SIZE = 500
+_UPLOAD_BATCH_SIZE = 30
 _VALID_UNIVERSES = {"hs300", "csi500", "csi1000"}
+
+
+def _convert_symbol(sym: str) -> str:
+    """sh.600519 -> 600519.SH, sz.000001 -> 000001.SZ"""
+    if "." in sym and sym[:2] in ("sh", "sz"):
+        prefix, code = sym.split(".", 1)
+        return f"{code}.{prefix.upper()}"
+    return sym
+
+
+def _convert_day(day: dict) -> dict:
+    return {
+        "date": str(day["date"]).split(" ")[0],
+        "values": {_convert_symbol(k): v for k, v in day["values"].items()},
+    }
 
 
 def is_configured() -> bool:
@@ -129,7 +146,8 @@ class CloudClient:
         factor_id = factor["id"]
         logger.info("Created cloud factor %s (%s)", factor_id, name)
 
-        upload_result = self.upload_values_batched(factor_id, factor_values_data)
+        converted_data = [_convert_day(d) for d in factor_values_data]
+        upload_result = self.upload_values_batched(factor_id, converted_data)
         logger.info(
             "Uploaded %d days in %d batches",
             upload_result["uploaded"],
@@ -143,3 +161,59 @@ class CloudClient:
 
 class CloudAPIError(Exception):
     pass
+
+
+def factor_df_to_cloud_format(factor_df: pd.DataFrame) -> list[dict]:
+    """Convert backtest _factor_df to Cloud upload format.
+
+    Input:  DataFrame with columns [trade_date, stock_code, factor_value, ...]
+    Output: [{date: "2024-01-02", values: {"sh.600519": 0.123}}, ...]
+    """
+    data = []
+    for trade_date, group in factor_df.groupby("trade_date"):
+        values = {}
+        for _, row in group.iterrows():
+            val = row["factor_value"]
+            if np.isfinite(val):
+                values[row["stock_code"]] = round(float(val), 6)
+        if values:
+            data.append({"date": str(trade_date).split(" ")[0], "values": values})
+    return data
+
+
+def auto_upload_to_cloud(
+    expression: str,
+    universe: str,
+    factor_df: pd.DataFrame,
+    claimed_ic_mean: float | None = None,
+    claimed_ic_ir: float | None = None,
+) -> dict | None:
+    """Auto-upload A-grade factor to Cloud for independent validation.
+
+    Returns Cloud validation result dict, or None if skipped/failed.
+    """
+    if not is_configured():
+        return None
+    if universe not in _VALID_UNIVERSES:
+        return None
+
+    try:
+        data = factor_df_to_cloud_format(factor_df)
+        if len(data) < 30:
+            logger.info("Cloud auto-upload skipped: only %d trading days", len(data))
+            return None
+
+        client = CloudClient()
+        result = client.upload_and_validate(
+            name=expression[:80],
+            universe=universe,
+            factor_values_data=data,
+            expression=expression,
+            claimed_ic_mean=claimed_ic_mean,
+            claimed_ic_ir=claimed_ic_ir,
+        )
+        logger.info("Cloud auto-upload completed: status=%s", result.get("status"))
+        return result
+    except Exception:
+        logger.exception("Cloud auto-upload failed")
+        return None

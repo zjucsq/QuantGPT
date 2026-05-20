@@ -37,13 +37,17 @@ export default function ResultsDashboard({ result, iterationSlot, onSaveFactor, 
 
   const [cloudConfigured, setCloudConfigured] = useState<boolean | null>(null);
   const [cloudUrl, setCloudUrl] = useState("");
-  const [cloudResult, setCloudResult] = useState<CloudValidationResult | null>(null);
+  const [cloudResult, setCloudResult] = useState<CloudValidationResult | null>(result.cloud_validation ?? null);
   const [cloudUploading, setCloudUploading] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
 
   useEffect(() => {
     checkCloudStatus().then((s) => { setCloudConfigured(s.configured); setCloudUrl(s.cloud_url); });
   }, []);
+
+  useEffect(() => {
+    if (result.cloud_validation) setCloudResult(result.cloud_validation);
+  }, [result.cloud_validation]);
 
   const handleCloudUpload = useCallback(async () => {
     setCloudUploading(true);

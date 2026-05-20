@@ -267,6 +267,20 @@ def _evaluate_candidate(
     }
     scoring = compute_factor_score(backtest_summary, report_result["metrics"], ao_val)
 
+    cloud_validation = None
+    if scoring["grade"] == "A" and factor_df is not None:
+        try:
+            from .cloud_client import auto_upload_to_cloud
+            cloud_validation = auto_upload_to_cloud(
+                expression=expression,
+                universe=params.get("universe", "hs300"),
+                factor_df=factor_df,
+                claimed_ic_mean=result.get("ic_mean"),
+                claimed_ic_ir=result.get("ic_ir"),
+            )
+        except Exception as e:
+            logger.warning(f"Cloud auto-upload failed for iteration candidate: {e}")
+
     return {
         "expression": expression,
         "status": "success",
@@ -276,6 +290,7 @@ def _evaluate_candidate(
         "backtest_summary": backtest_summary,
         "wq_brain": result.get("wq_brain", {}),
         "anti_overfit": anti_overfit_result,
+        "cloud_validation": cloud_validation,
         "report_metrics": report_result["metrics"],
         "report_url": f"/api/v1/reports/{report_filename}",
         "report_filename": report_filename,

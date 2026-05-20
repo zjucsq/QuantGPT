@@ -304,6 +304,21 @@ def _run_backtest_task(task_id: str, req: AutoBacktestRequest, user_id: str):
         interpretation["rating"] = scoring["grade"]
         interpretation["rating_reason"] = f"综合评分 {scoring['score']}/100"
 
+        cloud_validation = None
+        if scoring["grade"] == "A" and result.get("_factor_df") is not None:
+            task["status"] = "uploading_cloud"
+            try:
+                from ..cloud_client import auto_upload_to_cloud
+                cloud_validation = auto_upload_to_cloud(
+                    expression=expression,
+                    universe=req.universe,
+                    factor_df=result["_factor_df"],
+                    claimed_ic_mean=result.get("ic_mean"),
+                    claimed_ic_ir=result.get("ic_ir"),
+                )
+            except Exception as e:
+                logger.warning(f"[{task_id}] Cloud auto-upload failed: {e}")
+
         task["status"] = "completed"
 
         nav_series = []
@@ -346,6 +361,7 @@ def _run_backtest_task(task_id: str, req: AutoBacktestRequest, user_id: str):
             "anti_overfit": anti_overfit_result,
             "scoring": scoring,
             "interpretation": interpretation,
+            "cloud_validation": cloud_validation,
             "stock_factor_data": result.get("_stock_factor_data"),
             "nav_series": nav_series,
             "params": {
