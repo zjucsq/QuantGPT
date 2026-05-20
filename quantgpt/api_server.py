@@ -179,6 +179,7 @@ from .routes.sessions import router as sessions_router
 from .routes.factor_values import router as factor_values_router
 from .routes.wq_brain import router as wq_brain_router
 from .routes.wq_brain_batch import router as wq_brain_batch_router
+from .routes.cloud_upload import router as cloud_upload_router
 
 app.include_router(auth_router)
 app.include_router(sessions_router)
@@ -193,6 +194,7 @@ app.include_router(feedback_router)
 app.include_router(factor_values_router)
 app.include_router(wq_brain_router)
 app.include_router(wq_brain_batch_router)
+app.include_router(cloud_upload_router)
 
 
 # ---- robots.txt ----
