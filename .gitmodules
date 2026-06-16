@@ -1,3 +1,6 @@
 [submodule "3rd/tushare_quote"]
 	path = 3rd/tushare_quote
 	url = git@github.com:zjucsq/tushare_quote.git
+[submodule "3rd/tushare-complete-skill"]
+	path = 3rd/tushare-complete-skill
+	url = git@github.com:yixw001/tushare-complete-skill.git
