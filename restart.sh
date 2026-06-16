@@ -29,11 +29,33 @@ fi
 
 # Build frontend (set -e ensures we exit on failure)
 echo "Building frontend..."
-cd frontend && npm run build --silent && cd ..
+cd frontend
+if [ ! -d node_modules ]; then
+  echo "  Installing frontend dependencies..."
+  npm ci
+fi
+npm run build --silent
+cd ..
+
+# Pick the right Python (venv preferred)
+PYTHON=python3
+if [ -f .venv/bin/python ]; then
+  PYTHON=".venv/bin/python"
+elif [ -f .venv/Scripts/python.exe ]; then
+  PYTHON=".venv/Scripts/python.exe"
+fi
+
+# Generate .env from template if missing
+if [ ! -f .env ]; then
+  if [ -f .env.example ]; then
+    echo "Creating .env from .env.example..."
+    cp .env.example .env
+  fi
+fi
 
 # Start server
 echo "Starting QuantGPT on :8003..."
 mkdir -p logs
-nohup python3 -m quantgpt --transport http > logs/server.log 2>&1 &
+nohup "$PYTHON" -m quantgpt --transport http > logs/server.log 2>&1 &
 echo "PID: $!"
 echo "Logs: logs/server.log"

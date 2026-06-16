@@ -60,3 +60,9 @@ engine/Cargo.lock
 # Coverage
 .coverage
 htmlcov/
+
+# llm files
+prompts
+docs/develop
+AGENTS.md
+CLAUDE.md
