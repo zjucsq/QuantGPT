@@ -1,0 +1,3 @@
+[submodule "3rd/tushare_quote"]
+	path = 3rd/tushare_quote
+	url = git@github.com:zjucsq/tushare_quote.git
